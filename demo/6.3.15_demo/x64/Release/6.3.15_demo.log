@@ -1,0 +1,25 @@
+﻿  stdafx.cpp
+  traderSpi.cpp
+  getconfig.cpp
+  main.cpp
+e:\ctp-development\demo\6.3.15_demo\main.h(163): warning C4267: “=”: 从“size_t”转换到“int”，可能丢失数据
+e:\ctp-development\demo\6.3.15_demo\main.h(209): warning C4477: “fprintf”: 格式字符串“%d”需要类型“int”的参数，但可变参数 1 拥有了类型“TThostFtdcLargeVolumeType”
+e:\ctp-development\demo\6.3.15_demo\main.h(209): warning C4477: “printf”: 格式字符串“%d”需要类型“int”的参数，但可变参数 1 拥有了类型“TThostFtdcLargeVolumeType”
+e:\ctp-development\demo\6.3.15_demo\main.h(1388): warning C4806: “|”: 不安全操作: 从类型“bool”提升到类型“int”的值不能等于给定的常量
+e:\ctp-development\demo\6.3.15_demo\main.h(1388): warning C4554: “|”: 检查运算符优先级可能存在的错误；使用圆括号阐明优先级
+e:\ctp-development\demo\6.3.15_demo\main.h(1881): warning C4806: “&”: 不安全操作: 从类型“bool”提升到类型“int”的值不能等于给定的常量
+e:\ctp-development\demo\6.3.15_demo\main.h(1881): warning C4554: “&”: 检查运算符优先级可能存在的错误；使用圆括号阐明优先级
+e:\ctp-development\demo\6.3.15_demo\main.h(1899): warning C4806: “|”: 不安全操作: 从类型“bool”提升到类型“int”的值不能等于给定的常量
+e:\ctp-development\demo\6.3.15_demo\main.h(1899): warning C4554: “|”: 检查运算符优先级可能存在的错误；使用圆括号阐明优先级
+e:\ctp-development\demo\6.3.15_demo\main.h(1974): warning C4806: “|”: 不安全操作: 从类型“bool”提升到类型“int”的值不能等于给定的常量
+e:\ctp-development\demo\6.3.15_demo\main.h(1974): warning C4554: “|”: 检查运算符优先级可能存在的错误；使用圆括号阐明优先级
+  traderApi.cpp
+traderApi.cpp(1757): warning C4477: “fprintf”: 格式字符串“%s”需要类型“char *”的参数，但可变参数 1 拥有了类型“int”
+traderApi.cpp(1757): warning C4313: “fprintf”: 格式字符串中的“%s”与“int”类型的参数 1 冲突
+traderApi.cpp(1757): warning C4477: “printf”: 格式字符串“%s”需要类型“char *”的参数，但可变参数 1 拥有了类型“int”
+traderApi.cpp(1757): warning C4313: “printf”: 格式字符串中的“%s”与“int”类型的参数 1 冲突
+  正在生成代码
+  All 779 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  已完成代码的生成
+  6.3.15_demo.vcxproj -> E:\CTP-development\demo\x64\Release\testprogram.exe
+  6.3.15_demo.vcxproj -> E:\CTP-development\demo\x64\Release\testprogram.pdb (Full PDB)

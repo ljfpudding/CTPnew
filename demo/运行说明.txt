@@ -1,0 +1,8 @@
+在运行前，注意修改 6.3.15_demo 目录下的 config.ini和\x64\Debug目录下的config.ini,还有\x64\Release目录下的config.ini
+列示如下
+UserID=你的账号
+Password=你的密码
+InvestorID=你的账号
+
+
+代码更新修改人：谭文宏，2019.11.15 00：00，又是煎熬的夜
