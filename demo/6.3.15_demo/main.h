@@ -2,6 +2,7 @@
 #include "stdafx.h"
 #include <list>
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <stdio.h>
 #include <windows.h>
@@ -89,6 +90,12 @@ HANDLE xinhao = CreateEvent(NULL, false, false, NULL);
 
 CTraderApi *pUserApi = new CTraderApi;
 
+
+typedef char  TThostFtdcMdcsvFileName[256];
+TThostFtdcMdcsvFileName g_chMdcsvFileName;
+
+
+
 //行情类
 class CSimpleMdHandler : public CThostFtdcMdSpi
 {
@@ -143,9 +150,11 @@ public:
 	void SubscribeMarketData()//收行情
 	{
 		int md_num = 0;
-		//char *ppInstrumentID[] = { "ag1912" };			// 行情订阅列表
-		//int result = m_pUserMdApi->SubscribeMarketData(ppInstrumentID, 1);
-		//*
+		char *ppInstrumentID[] = { "fu2005" };			// 行情订阅列表
+		int result = m_pUserMdApi->SubscribeMarketData(ppInstrumentID, 1);
+		LOG((result == 0) ? "订阅行情请求1......发送成功\n" : "订阅行情请求1......发送失败，错误序号=[%d]\n", result);
+		
+		/*
 		char **ppInstrumentID = new char*[5000];
 		for (int count1 = 0; count1 <= md_InstrumentID.size() / 500; count1++)
 		{
@@ -172,13 +181,14 @@ public:
 				LOG((result == 0) ? "订阅行情请求2......发送成功\n" : "订阅行情请求2......发送失败，错误序号=[%d]\n", result);
 			}
 		}
-		//*/
+		*/
 	}
 
 	///订阅行情应答
-	virtual void OnRspSubMarketData(CThostFtdcSpecificInstrumentField *pSpecificInstrument, CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+	virtual void OnRspSubMarketData(CThostFtdcSpecificInstrumentField *pSpecificInstrument, 
+		CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 	{
-		LOG("<OnRspSubMarketData>\n");
+		/*LOG("<OnRspSubMarketData>\n");
 		if (pSpecificInstrument)
 		{
 			LOG("\tInstrumentID = [%s]\n", pSpecificInstrument->InstrumentID);
@@ -190,13 +200,149 @@ public:
 		}
 		LOG("\tnRequestID = [%d]\n", nRequestID);
 		LOG("\tbIsLast = [%d]\n", bIsLast);
-		LOG("</OnRspSubMarketData>\n");
+		LOG("</OnRspSubMarketData>\n"); */
+
+
+
+		bool bResult = pRspInfo && (pRspInfo->ErrorID != 0);
+		if (!bResult)
+		{
+			//LOG("" == == = 订阅行情成功 == == = "");
+			//LOG("")
+			//std::cout << "=====订阅行情成功=====" << std::endl;
+			//std::cout << "合约代码： " << pSpecificInstrument->InstrumentID << std::endl;
+			// 如果需要存入文件或者数据库，在这里创建表头,不同的合约单独存储
+
+			memset(&g_chMdcsvFileName, 0, sizeof(TThostFtdcMdcsvFileName));
+
+			char filePath[100] = { '\0' };
+			//sprintf(filePath, "%s_market_data.csv", pSpecificInstrument->InstrumentID);
+			time_t currtime = time(NULL);
+			struct tm *mt= localtime(&currtime);
+			
+				
+			sprintf(g_chMdcsvFileName, "%s_market_data%d%02d%02d%02d%02d.csv", pSpecificInstrument->InstrumentID,mt->tm_year+1900,mt->tm_mon+1,mt->tm_mday,mt->tm_hour,mt->tm_min);
+
+			std::ofstream outFile;
+			//outFile.open(filePath, std::ios::out); // 新开文件
+			outFile.open(g_chMdcsvFileName, std::ios::out); // 新开文件
+
+
+			/*outFile << "合约代码" << ","
+				<< "更新时间" << ","
+				<< "最新价" << ","
+				<< "成交量" << ","
+				<< "买价一" << ","
+				<< "买量一" << ","
+				<< "卖价一" << ","
+				<< "卖量一" << ","
+				<< "持仓量" << ","
+				<< "换手率"
+				<< std::endl; */
+
+
+
+
+
+			outFile << "合约代码" << ","
+				<<"交易日"<<","
+				<< "上次结算价" << ","
+				<< "昨持仓量" << ","
+				<< "涨停板价" << ","
+				<< "跌停板价" << ","
+				<< "今开盘" << ","
+				<< "最高价" << ","
+				<< "最低价" << ","
+
+
+				<< "最后修改时间" << ","
+				<< "最后修改毫秒" << ","
+
+				//<<"交易所代码"<<","
+				//<<"合约在交易所的代码"<<","
+				<< "最新价" << ","
+		
+				//<<"昨收盘"<<","
+			
+	
+				<<"数量"<<","
+				<< "成交金额" << ","
+
+
+				<< "持仓量" << ","
+
+				<< "今收盘" << ","
+				<< "本次结算价" << ","
+
+				//<< "昨虚实度" << ","
+				//<< "今虚实度" << ","
+	
+				<< "申买价一" << ","
+				<< "申买量一" << ","
+				<< "申卖价一" << ","
+				<< "申卖量一" 
+
+				//<< "申买价二" << ","
+				//<< "申买量二" << ","
+				//<< "申卖价二" << ","
+				//<< "申卖量二" << ","
+
+				//<< "申买价三" << ","
+				//<< "申买量三" << ","
+				//<< "申卖价三" << ","
+				//<< "申卖量三" << ","
+
+				//<< "申买价四" << ","
+				//<< "申买量四" << ","
+				//<< "申卖价四" << ","
+				//<< "申卖量四" << ","
+
+
+				//<< "申买价五" << ","
+				//<< "申买量五" << ","
+				//<< "申卖价五" << ","
+				//<< "申卖量五" << ","
+
+
+
+				//<< "当日均价" << ","
+				//<< "业务日期" 
+				<< std::endl;
+
+
+
+
+
+
+
+
+
+
+
+
+
+			outFile.close();
+
+
+
+
+
+
+
+
+		}
+		else
+		{
+
+		}
+
+
 	}
 
 	///深度行情通知
 	virtual void OnRtnDepthMarketData(CThostFtdcDepthMarketDataField *pDepthMarketData)
 	{
-		LOG("<OnRtnDepthMarketData>\n");
+	/*	LOG("<OnRtnDepthMarketData>\n");
 		if (pDepthMarketData)
 		{
 			LOG("\tInstrumentID = [%s]\n", pDepthMarketData->InstrumentID);
@@ -208,7 +354,121 @@ public:
 			LOG("\tTurnover = [%.8lf]\n", pDepthMarketData->Turnover);
 			LOG("\tOpenInterest = [%d]\n", pDepthMarketData->OpenInterest);
 		}
-		LOG("</OnRtnDepthMarketData>\n");
+		LOG("</OnRtnDepthMarketData>\n"); */
+
+
+
+
+		char filePath[100] = { '\0' };
+		sprintf(filePath, "%s_market_data.csv", pDepthMarketData->InstrumentID);
+		
+		std::ofstream outFile;
+		
+		//outFile.open(filePath, std::ios::app); // 文件追加写入 
+		outFile.open(g_chMdcsvFileName, std::ios::app); // 文件追加写入 
+
+
+		outFile << pDepthMarketData->InstrumentID << "," //合约代码
+			<< pDepthMarketData->TradingDay << ","  //交易日
+			<< pDepthMarketData->PreSettlementPrice << "," //上次结算价
+			<< pDepthMarketData->PreOpenInterest << ","  //昨持仓量
+
+
+			<< pDepthMarketData->UpperLimitPrice << "," //涨停板价
+			<< pDepthMarketData->LowerLimitPrice << "," //跌停板价
+
+			<< pDepthMarketData->OpenPrice << ","  //今开盘
+			<< pDepthMarketData->HighestPrice << "," //最高价
+			<< pDepthMarketData->LowestPrice << ","  //最低价
+
+			<< pDepthMarketData->UpdateTime << ","     //最后修改时间
+			<< pDepthMarketData->UpdateMillisec << ","  //毫秒
+
+
+			//<< pDepthMarketData->ExchangeID << ","
+			//<< pDepthMarketData->ExchangeInstID << ","
+			
+			<< pDepthMarketData->LastPrice << ","   //最新价
+
+
+			<< pDepthMarketData->Volume << ","  //数量
+
+			<< pDepthMarketData->Turnover << "," //成交金额 
+
+			<< pDepthMarketData->OpenInterest << ","  //持仓量
+
+
+			<< pDepthMarketData->ClosePrice << ","  //今收盘
+			<< pDepthMarketData->SettlementPrice << "," //本次结算价
+
+
+		
+
+			//<< pDepthMarketData->PreClosePrice << ","
+			
+
+			
+			//<< pDepthMarketData->Turnover << ","
+			
+
+			//
+			//
+
+
+		
+			
+			//<< pDepthMarketData->PreDelta << ","
+			//<< pDepthMarketData->CurrDelta << ","
+
+	
+			
+			
+			<< pDepthMarketData->BidPrice1 << ","    //买一价
+			<< pDepthMarketData->BidVolume1 << ","   //买一量
+			<< pDepthMarketData->AskPrice1 << ","   //卖一价
+			<< pDepthMarketData->AskVolume1         //卖一量
+			//<< pDepthMarketData->BidPrice2 << ","
+			//<< pDepthMarketData->BidVolume2 << ","
+			//<< pDepthMarketData->AskPrice2 << ","
+			//<< pDepthMarketData->AskVolume2 << ","
+			//<< pDepthMarketData->BidPrice3 << ","
+			//<< pDepthMarketData->BidVolume3 << ","
+			//<< pDepthMarketData->AskPrice3 << ","
+			//<< pDepthMarketData->AskVolume3 << ","
+			//<< pDepthMarketData->BidPrice4 << ","
+			//<< pDepthMarketData->BidVolume4 << ","
+			//<< pDepthMarketData->AskPrice4 << ","
+			//<< pDepthMarketData->AskVolume4 << ","
+			//<< pDepthMarketData->BidPrice5 << ","
+			//<< pDepthMarketData->BidVolume5 << ","
+			//<< pDepthMarketData->AskPrice5 << ","
+			//<< pDepthMarketData->AskVolume5 << ","
+			//<< pDepthMarketData->AveragePrice << ","
+			//<< pDepthMarketData->ActionDay
+			<< std::endl;
+
+
+
+
+
+
+
+
+			/*<< pDepthMarketData->UpdateTime << "." << pDepthMarketData->UpdateMillisec << ","
+			<< pDepthMarketData->LastPrice << ","
+			<< pDepthMarketData->Volume << ","
+			<< pDepthMarketData->BidPrice1 << ","
+			<< pDepthMarketData->BidVolume1 << ","
+			<< pDepthMarketData->AskPrice1 << ","
+			<< pDepthMarketData->AskVolume1 << ","
+			<< pDepthMarketData->OpenInterest << ","
+			<< pDepthMarketData->Turnover << std::endl;
+			*/
+
+		outFile.close();
+
+
+
 	}
 
 	///订阅询价请求
@@ -1288,6 +1548,10 @@ public:
 		CThostFtdcQryInstrumentField a = { 0 };
 		strcpy_s(a.ExchangeID, g_chExchangeID);
 		strcpy_s(a.InstrumentID, g_chInstrumentID);
+
+		//strcpy_s(a.ExchangeID, "SHFE");
+		//strcpy_s(a.InstrumentID, "fu2005");
+
 		//strcpy_s(a.ExchangeInstID,"");
 		//strcpy_s(a.ProductID, "m");
 		int b = m_pUserApi->ReqQryInstrument(&a, nRequestID++);
