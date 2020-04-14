@@ -91,17 +91,61 @@ HANDLE xinhao = CreateEvent(NULL, false, false, NULL);
 CTraderApi *pUserApi = new CTraderApi;
 
 
-typedef char  TThostFtdcMdcsvFileName[256];
-TThostFtdcMdcsvFileName g_chMdcsvFileName;
 
+
+
+
+enum open_interest_delta_forward_enum
+{
+	OPEN, CLOSE, EXCHANGE, NONE, OPENFWDOUBLE, CLOSEFWDOUBLE
+};
+
+enum order_forward_enum
+{
+	UP, DOWN, MIDDLE
+};
+
+
+enum tick_type_enum
+{
+	OPENLONG, OPENSHORT, OPENDOUBLE,
+	CLOSELONG, CLOSESHORT, CLOSEDOUBLE,
+	EXCHANGELONG, EXCHANGESHORT,
+	OPENUNKOWN, CLOSEUNKOWN, EXCHANGEUNKOWN,
+	UNKOWN, NOCHANGE
+};
+enum tick_color_enum
+{
+	RED, GREEN, WHITE
+};
+enum tick_type_key_enum
+{
+	TICKTYPE, TICKCOLOR
+};
+enum opponent_key_enum
+{
+	OPPOSITE, SIMILAR
+};
+
+
+typedef char  TThostFtdcMdcsvFileName[256];  //存储行情明细的文件名
+typedef char TThostFtdcMdPankouFileName[256]; //存储盘口的文件名  主要是昨结算价  涨停价  跌停价
 
 
 //行情类
 class CSimpleMdHandler : public CThostFtdcMdSpi
 {
+
 public:
 	// 构造函数，需要一个有效的指向CThostFtdcMduserApi实例的指针
-	CSimpleMdHandler(CThostFtdcMdApi *pUserApi) : m_pUserMdApi(pUserApi) {}
+	CSimpleMdHandler(CThostFtdcMdApi *pUserApi) : m_pUserMdApi(pUserApi) {
+	
+		memset(&m_preDepthMarketData, 0, sizeof(m_preDepthMarketData));
+		init_tick_type_dict();
+		init_tick_type_str_dict();
+		init_handicap_dict();
+
+	}
 	~CSimpleMdHandler() {}
 	// 当客户端与交易托管系统建立起通信连接，客户端需要进行登录
 	virtual void OnFrontConnected()
@@ -188,147 +232,60 @@ public:
 	virtual void OnRspSubMarketData(CThostFtdcSpecificInstrumentField *pSpecificInstrument, 
 		CThostFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 	{
-		/*LOG("<OnRspSubMarketData>\n");
-		if (pSpecificInstrument)
-		{
-			LOG("\tInstrumentID = [%s]\n", pSpecificInstrument->InstrumentID);
-		}
-		if (pRspInfo)
-		{
-			LOG("\tErrorMsg = [%s]\n", pRspInfo->ErrorMsg);
-			LOG("\tErrorID = [%d]\n", pRspInfo->ErrorID);
-		}
-		LOG("\tnRequestID = [%d]\n", nRequestID);
-		LOG("\tbIsLast = [%d]\n", bIsLast);
-		LOG("</OnRspSubMarketData>\n"); */
-
-
-
 		bool bResult = pRspInfo && (pRspInfo->ErrorID != 0);
 		if (!bResult)
 		{
-			//LOG("" == == = 订阅行情成功 == == = "");
-			//LOG("")
-			//std::cout << "=====订阅行情成功=====" << std::endl;
-			//std::cout << "合约代码： " << pSpecificInstrument->InstrumentID << std::endl;
-			// 如果需要存入文件或者数据库，在这里创建表头,不同的合约单独存储
-
-			memset(&g_chMdcsvFileName, 0, sizeof(TThostFtdcMdcsvFileName));
-
+			memset(&m_chMdcsvFileName, 0, sizeof(TThostFtdcMdcsvFileName));
 			char filePath[100] = { '\0' };
 			//sprintf(filePath, "%s_market_data.csv", pSpecificInstrument->InstrumentID);
 			time_t currtime = time(NULL);
-			struct tm *mt= localtime(&currtime);
-			
-				
-			sprintf(g_chMdcsvFileName, "%s_market_data%d%02d%02d%02d%02d.csv", pSpecificInstrument->InstrumentID,mt->tm_year+1900,mt->tm_mon+1,mt->tm_mday,mt->tm_hour,mt->tm_min);
-
+			struct tm *mt= localtime(&currtime);				
+			sprintf(m_chMdcsvFileName, "%s_market_data%d%02d%02d%02d%02d.csv", pSpecificInstrument->InstrumentID,mt->tm_year+1900,mt->tm_mon+1,mt->tm_mday,mt->tm_hour,mt->tm_min);
 			std::ofstream outFile;
 			//outFile.open(filePath, std::ios::out); // 新开文件
-			outFile.open(g_chMdcsvFileName, std::ios::out); // 新开文件
+			outFile.open(m_chMdcsvFileName, std::ios::out); // 新开文件
 
-
-			/*outFile << "合约代码" << ","
-				<< "更新时间" << ","
-				<< "最新价" << ","
-				<< "成交量" << ","
-				<< "买价一" << ","
-				<< "买量一" << ","
-				<< "卖价一" << ","
-				<< "卖量一" << ","
-				<< "持仓量" << ","
-				<< "换手率"
-				<< std::endl; */
-
-
-
-
-
-			outFile << "合约代码" << ","
-				<<"交易日"<<","
-				<< "上次结算价" << ","
-				<< "昨持仓量" << ","
-				<< "涨停板价" << ","
-				<< "跌停板价" << ","
-				<< "今开盘" << ","
-				<< "最高价" << ","
-				<< "最低价" << ","
-
-
+			outFile 
+				//<< "合约代码" << ","
+				//<<"交易日"<<","
+				//<< "上次结算价" << ","
+				//<< "昨持仓量" << ","
+				//<< "涨停板价" << ","
+				//<< "跌停板价" << ","
+				//<< "今开盘" << ","
+				//<< "最高价" << ","
+				//<< "最低价" << ","
 				<< "最后修改时间" << ","
 				<< "最后修改毫秒" << ","
-
-				//<<"交易所代码"<<","
-				//<<"合约在交易所的代码"<<","
 				<< "最新价" << ","
-		
-				//<<"昨收盘"<<","
-			
-	
 				<<"数量"<<","
-				<< "成交金额" << ","
-
-
+				//<< "成交金额" << ","
 				<< "持仓量" << ","
-
-				<< "今收盘" << ","
-				<< "本次结算价" << ","
-
-				//<< "昨虚实度" << ","
-				//<< "今虚实度" << ","
-	
+				//<< "今收盘" << ","
+				//<< "本次结算价" << ","
 				<< "申买价一" << ","
 				<< "申买量一" << ","
 				<< "申卖价一" << ","
-				<< "申卖量一" 
-
-				//<< "申买价二" << ","
-				//<< "申买量二" << ","
-				//<< "申卖价二" << ","
-				//<< "申卖量二" << ","
-
-				//<< "申买价三" << ","
-				//<< "申买量三" << ","
-				//<< "申卖价三" << ","
-				//<< "申卖量三" << ","
-
-				//<< "申买价四" << ","
-				//<< "申买量四" << ","
-				//<< "申卖价四" << ","
-				//<< "申卖量四" << ","
-
-
-				//<< "申买价五" << ","
-				//<< "申买量五" << ","
-				//<< "申卖价五" << ","
-				//<< "申卖量五" << ","
-
-
-
-				//<< "当日均价" << ","
-				//<< "业务日期" 
+				<< "申卖量一" <<","
+				<< "现手" <<","
+				<< "增仓" <<","
+				<< "方向"
 				<< std::endl;
-
-
-
-
-
-
-
-
-
-
-
-
 
 			outFile.close();
 
-
-
-
-
-
-
+			memset(&m_chMdPankouFileName, 0, sizeof(TThostFtdcMdcsvFileName)); //盘口文件
+			sprintf(m_chMdPankouFileName, "%s_market_pankou_data%d%02d%02d%02d%02d.csv", pSpecificInstrument->InstrumentID, mt->tm_year + 1900, mt->tm_mon + 1, mt->tm_mday, mt->tm_hour, mt->tm_min);
+			std::ofstream outPamkouFile;
+			outPamkouFile.open(m_chMdPankouFileName, std::ios::out); // 新盘口开文件
+			outPamkouFile << "上次结算价" << ","
+				<< "昨持仓量" << ","
+				<< "涨停板价" << ","
+				<< "跌停板价" << ","
+				<< "今开盘价" << ","
+				<< "最高价" << ","
+				<< "最低价" << std::endl;
+				outPamkouFile.close();
 
 		}
 		else
@@ -336,116 +293,140 @@ public:
 
 		}
 
-
 	}
 
 	///深度行情通知
 	virtual void OnRtnDepthMarketData(CThostFtdcDepthMarketDataField *pDepthMarketData)
 	{
-	/*	LOG("<OnRtnDepthMarketData>\n");
-		if (pDepthMarketData)
-		{
-			LOG("\tInstrumentID = [%s]\n", pDepthMarketData->InstrumentID);
-			LOG("\tExchangeID = [%s]\n", pDepthMarketData->ExchangeID);
-			LOG("\tLastPrice = [%.8lf]\n", pDepthMarketData->LastPrice);
-			LOG("\tPreSettlementPrice = [%.8lf]\n", pDepthMarketData->PreSettlementPrice);
-			LOG("\tOpenPrice = [%.8lf]\n", pDepthMarketData->OpenPrice);
-			LOG("\tVolume = [%d]\n", pDepthMarketData->Volume);
-			LOG("\tTurnover = [%.8lf]\n", pDepthMarketData->Turnover);
-			LOG("\tOpenInterest = [%d]\n", pDepthMarketData->OpenInterest);
-		}
-		LOG("</OnRtnDepthMarketData>\n"); */
-
-
-
-
-		char filePath[100] = { '\0' };
-		sprintf(filePath, "%s_market_data.csv", pDepthMarketData->InstrumentID);
-		
-		std::ofstream outFile;
-		
-		//outFile.open(filePath, std::ios::app); // 文件追加写入 
-		outFile.open(g_chMdcsvFileName, std::ios::app); // 文件追加写入 
-
-
-		outFile << pDepthMarketData->InstrumentID << "," //合约代码
-			<< pDepthMarketData->TradingDay << ","  //交易日
-			<< pDepthMarketData->PreSettlementPrice << "," //上次结算价
-			<< pDepthMarketData->PreOpenInterest << ","  //昨持仓量
-
-
-			<< pDepthMarketData->UpperLimitPrice << "," //涨停板价
-			<< pDepthMarketData->LowerLimitPrice << "," //跌停板价
-
-			<< pDepthMarketData->OpenPrice << ","  //今开盘
-			<< pDepthMarketData->HighestPrice << "," //最高价
-			<< pDepthMarketData->LowestPrice << ","  //最低价
-
-			<< pDepthMarketData->UpdateTime << ","     //最后修改时间
-			<< pDepthMarketData->UpdateMillisec << ","  //毫秒
-
-
-			//<< pDepthMarketData->ExchangeID << ","
-			//<< pDepthMarketData->ExchangeInstID << ","
-			
-			<< pDepthMarketData->LastPrice << ","   //最新价
-
-
-			<< pDepthMarketData->Volume << ","  //数量
-
-			<< pDepthMarketData->Turnover << "," //成交金额 
-
-			<< pDepthMarketData->OpenInterest << ","  //持仓量
-
-
-			<< pDepthMarketData->ClosePrice << ","  //今收盘
-			<< pDepthMarketData->SettlementPrice << "," //本次结算价
-
-
-		
-
-			//<< pDepthMarketData->PreClosePrice << ","
-			
-
-			
-			//<< pDepthMarketData->Turnover << ","
-			
-
-			//
-			//
-
-
-		
-			
-			//<< pDepthMarketData->PreDelta << ","
-			//<< pDepthMarketData->CurrDelta << ","
 
 	
-			
-			
-			<< pDepthMarketData->BidPrice1 << ","    //买一价
-			<< pDepthMarketData->BidVolume1 << ","   //买一量
-			<< pDepthMarketData->AskPrice1 << ","   //卖一价
-			<< pDepthMarketData->AskVolume1         //卖一量
-			//<< pDepthMarketData->BidPrice2 << ","
-			//<< pDepthMarketData->BidVolume2 << ","
-			//<< pDepthMarketData->AskPrice2 << ","
-			//<< pDepthMarketData->AskVolume2 << ","
-			//<< pDepthMarketData->BidPrice3 << ","
-			//<< pDepthMarketData->BidVolume3 << ","
-			//<< pDepthMarketData->AskPrice3 << ","
-			//<< pDepthMarketData->AskVolume3 << ","
-			//<< pDepthMarketData->BidPrice4 << ","
-			//<< pDepthMarketData->BidVolume4 << ","
-			//<< pDepthMarketData->AskPrice4 << ","
-			//<< pDepthMarketData->AskVolume4 << ","
-			//<< pDepthMarketData->BidPrice5 << ","
-			//<< pDepthMarketData->BidVolume5 << ","
-			//<< pDepthMarketData->AskPrice5 << ","
-			//<< pDepthMarketData->AskVolume5 << ","
-			//<< pDepthMarketData->AveragePrice << ","
-			//<< pDepthMarketData->ActionDay
-			<< std::endl;
+
+		
+		if (!m_bPankouData)
+		{
+			std::ofstream outPankouFile;
+			outPankouFile.open(m_chMdPankouFileName, std::ios::app); // 文件追加写入 
+			outPankouFile
+				<< pDepthMarketData->PreSettlementPrice << "," //上次结算价
+				<< pDepthMarketData->PreOpenInterest << ","  //昨持仓量
+				<< pDepthMarketData->UpperLimitPrice << "," //涨停板价
+				<< pDepthMarketData->LowerLimitPrice << "," //跌停板价
+				<< pDepthMarketData->OpenPrice << ","  //今开盘
+				<< pDepthMarketData->HighestPrice << "," //最高价
+				<< pDepthMarketData->LowestPrice  //最低价
+				<< std::endl;
+			outPankouFile.close();
+			m_bPankouData = true;
+		}
+
+
+			if (pDepthMarketData && m_preDepthMarketData.LastPrice != 0)
+			{
+				// 计算两tick之间的差值
+				cout << "Volume" << pDepthMarketData->Volume << "PreVolume" << m_preDepthMarketData.Volume << endl;
+				cout << "OpenInterest" << pDepthMarketData->OpenInterest << "PreOpenInterest" << m_preDepthMarketData.OpenInterest << endl;
+				double ask_price_delta = m_preDepthMarketData.AskPrice1 - pDepthMarketData->AskPrice1;
+				int ask_volume_delta = m_preDepthMarketData.AskVolume1 - pDepthMarketData->AskVolume1;
+				double	bid_price_delta = m_preDepthMarketData.BidPrice1 - pDepthMarketData->BidPrice1;
+				int bid_volume_delta = m_preDepthMarketData.BidVolume1 - pDepthMarketData->BidVolume1;
+				double last_price_delta = m_preDepthMarketData.LastPrice - pDepthMarketData->LastPrice;
+				int volume_delta = pDepthMarketData->Volume - m_preDepthMarketData.Volume;
+				int open_interest_delta = int(pDepthMarketData->OpenInterest - m_preDepthMarketData.OpenInterest);
+
+				//编移量的显示字符串
+				string ask_price_delta_str = get_delta_str(m_preDepthMarketData.AskPrice1, pDepthMarketData->AskPrice1);
+				string	ask_volume_delta_str = get_delta_str(m_preDepthMarketData.AskVolume1, pDepthMarketData->AskVolume1);
+				string bid_price_delta_str = get_delta_str(m_preDepthMarketData.BidPrice1, pDepthMarketData->BidPrice1);
+				string bid_volume_delta_str = get_delta_str(m_preDepthMarketData.BidVolume1, pDepthMarketData->BidVolume1);
+				string last_price_delta_str = get_delta_str(m_preDepthMarketData.LastPrice, pDepthMarketData->LastPrice);
+
+				//如果ask或者bid价格对比上一个tick都发生了变化则不显示价格变化幅度
+				if (ask_price_delta != 0)
+					ask_volume_delta_str = "";
+				if (bid_price_delta != 0)
+					bid_volume_delta_str = "";
+
+				//input1 计算订单是在ask范围内成交还是在bid范围内成交
+				order_forward_enum	order_forward = get_order_forward(pDepthMarketData->LastPrice,
+					pDepthMarketData->AskPrice1, pDepthMarketData->BidPrice1,
+					m_preDepthMarketData.LastPrice, m_preDepthMarketData.AskPrice1, m_preDepthMarketData.BidPrice1);
+
+				//input2 计算仓位变化方向
+				open_interest_delta_forward_enum open_interest_delta_forward = get_open_interest_delta_forward(open_interest_delta,
+					volume_delta);
+
+				//f(input1, input2) = output1 根据成交区域和仓位变化方向计算出tick的类型
+				TICK_TYPE tick_type_dict = m_tick_type_dict[open_interest_delta_forward][order_forward];
+
+				if (open_interest_delta_forward != open_interest_delta_forward_enum::NONE)
+				{	//# 输出相关变量
+					//cout << "Ask\t" << pDepthMarketData->AskPrice1 << ask_price_delta_str << "\t" << pDepthMarketData->AskVolume1
+					//	<< ask_volume_delta_str << "\tBid\t" << pDepthMarketData->BidPrice1 << bid_price_delta_str << "\t" <<
+					//	pDepthMarketData->BidVolume1 << bid_volume_delta_str << endl;
+
+					//cout << pDepthMarketData->UpdateTime << "." << pDepthMarketData->UpdateMillisec
+					//	<< "\t" << pDepthMarketData->LastPrice << last_price_delta_str
+					//	<< "\t成交 " << volume_delta
+					//	<< "\t增仓 " << open_interest_delta << endl;
+
+					//cout << m_tick_type_str_dict[tick_type_dict[tick_type_key_enum::TICKTYPE]].c_str()
+					//	<< "\t" << m_color_type_str_dict[tick_type_dict[tick_type_key_enum::TICKCOLOR]].c_str() << endl;
+
+					//cout << "--------------------------------------" << endl;
+				}
+
+				std::ofstream outFile;
+				outFile.open(m_chMdcsvFileName, std::ios::app); // 文件追加写入 
+				outFile
+					//<< pDepthMarketData->InstrumentID << "," //合约代码
+					//<< pDepthMarketData->TradingDay << ","  //交易日
+					//<< pDepthMarketData->PreSettlementPrice << "," //上次结算价
+					//<< pDepthMarketData->PreOpenInterest << ","  //昨持仓量
+					//<< pDepthMarketData->UpperLimitPrice << "," //涨停板价
+					//<< pDepthMarketData->LowerLimitPrice << "," //跌停板价
+					//<< pDepthMarketData->OpenPrice << ","  //今开盘
+					//<< pDepthMarketData->HighestPrice << "," //最高价
+					//<< pDepthMarketData->LowestPrice << ","  //最低价
+					<< pDepthMarketData->UpdateTime << ","     //最后修改时间
+					<< pDepthMarketData->UpdateMillisec << ","  //毫秒
+																//<< pDepthMarketData->ExchangeID << ","
+																//<< pDepthMarketData->ExchangeInstID << ","
+					<< pDepthMarketData->LastPrice << ","   //最新价
+					<< pDepthMarketData->Volume << ","  //数量
+														//<< pDepthMarketData->Turnover << "," //成交金额 
+					<< pDepthMarketData->OpenInterest << ","  //持仓量
+															  //<< pDepthMarketData->ClosePrice << ","  //今收盘
+															  //<< pDepthMarketData->SettlementPrice << "," //本次结算价
+															  //<< pDepthMarketData->PreClosePrice << ","
+															  //<< pDepthMarketData->PreDelta << ","
+															  //<< pDepthMarketData->CurrDelta << ","
+					<< pDepthMarketData->BidPrice1 << ","    //买一价
+					<< pDepthMarketData->BidVolume1 << ","   //买一量
+					<< pDepthMarketData->AskPrice1 << ","   //卖一价
+					<< pDepthMarketData->AskVolume1 <<","        //卖一量
+															//<< pDepthMarketData->BidPrice2 << ","
+															//<< pDepthMarketData->BidVolume2 << ","
+															//<< pDepthMarketData->AskPrice2 << ","
+															//<< pDepthMarketData->AskVolume2 << ","
+															//<< pDepthMarketData->BidPrice3 << ","
+															//<< pDepthMarketData->BidVolume3 << ","
+															//<< pDepthMarketData->AskPrice3 << ","
+															//<< pDepthMarketData->AskVolume3 << ","
+															//<< pDepthMarketData->BidPrice4 << ","
+															//<< pDepthMarketData->BidVolume4 << ","
+															//<< pDepthMarketData->AskPrice4 << ","
+															//<< pDepthMarketData->AskVolume4 << ","
+															//<< pDepthMarketData->BidPrice5 << ","
+															//<< pDepthMarketData->BidVolume5 << ","
+															//<< pDepthMarketData->AskPrice5 << ","
+															//<< pDepthMarketData->AskVolume5 << ","
+															//<< pDepthMarketData->AveragePrice << ","
+															//<< pDepthMarketData->ActionDay
+					<< volume_delta <<","
+					<< open_interest_delta<<","
+					<< m_tick_type_str_dict[tick_type_dict[tick_type_key_enum::TICKTYPE]] + m_color_type_str_dict[tick_type_dict[tick_type_key_enum::TICKCOLOR]]
+					<< std::endl;
+				outFile.close();
 
 
 
@@ -453,19 +434,13 @@ public:
 
 
 
-
-			/*<< pDepthMarketData->UpdateTime << "." << pDepthMarketData->UpdateMillisec << ","
-			<< pDepthMarketData->LastPrice << ","
-			<< pDepthMarketData->Volume << ","
-			<< pDepthMarketData->BidPrice1 << ","
-			<< pDepthMarketData->BidVolume1 << ","
-			<< pDepthMarketData->AskPrice1 << ","
-			<< pDepthMarketData->AskVolume1 << ","
-			<< pDepthMarketData->OpenInterest << ","
-			<< pDepthMarketData->Turnover << std::endl;
-			*/
-
-		outFile.close();
+			}
+			else
+			{
+				printf("Null depthMarketdata\n");
+			}
+		
+			memcpy(&m_preDepthMarketData, pDepthMarketData, sizeof(m_preDepthMarketData));
 
 
 
@@ -519,9 +494,206 @@ public:
 		SetEvent(xinhao);
 	}
 
+
+
+
+	template <typename T>
+	string get_delta_str(T pre, T data)
+	{
+		string offset_str = "";
+		if (data > pre)
+		{
+			offset_str = "(+" + to_string(data - pre) + ")";
+		}
+		else if (data < pre)
+		{
+			offset_str = "(-" + to_string(pre - data) + ")";
+		}
+		return offset_str;
+	}
+
+	open_interest_delta_forward_enum get_open_interest_delta_forward(int open_interest_delta, int volume_delta)
+	{	/*根据成交量的差和持仓量的差来获取仓位变化的方向
+		return : open_interest_delta_forward_enum
+		*/
+		open_interest_delta_forward_enum local_open_interest_delta_forward;
+		if (open_interest_delta == 0 && volume_delta == 0)
+			local_open_interest_delta_forward = open_interest_delta_forward_enum::NONE;
+		else if (open_interest_delta == 0 && volume_delta > 0)
+			local_open_interest_delta_forward = open_interest_delta_forward_enum::EXCHANGE;
+		else if (open_interest_delta > 0)
+		{
+			if (open_interest_delta - volume_delta == 0)
+				local_open_interest_delta_forward = open_interest_delta_forward_enum::OPENFWDOUBLE;
+			else
+				local_open_interest_delta_forward = open_interest_delta_forward_enum::OPEN;
+		}
+		else if (open_interest_delta < 0)
+		{
+			if (open_interest_delta + volume_delta == 0)
+				local_open_interest_delta_forward = open_interest_delta_forward_enum::CLOSEFWDOUBLE;
+			else
+				local_open_interest_delta_forward = open_interest_delta_forward_enum::CLOSE;
+		}
+		return local_open_interest_delta_forward;
+	}
+
+	order_forward_enum get_order_forward(double last_price, double ask_price1, double bid_price1,
+		double pre_last_price, double pre_ask_price1, double pre_bid_price1)
+	{
+		enum order_forward_enum local_order_forward;
+		//获取成交的区域，根据当前tick的成交价和上个tick的ask和bid价格进行比对
+		if (last_price >= pre_ask_price1)
+		{
+			local_order_forward = order_forward_enum::UP;
+		}
+		else if (last_price <= pre_bid_price1)
+		{
+			local_order_forward = order_forward_enum::DOWN;
+		}
+		else
+		{
+			if (last_price >= ask_price1)
+			{
+				local_order_forward = order_forward_enum::UP;
+			}
+			else if (last_price <= bid_price1)
+			{
+				local_order_forward = order_forward_enum::DOWN;
+			}
+			else
+			{
+				local_order_forward = order_forward_enum::MIDDLE;
+			}
+		}
+		return local_order_forward;
+	}
+
+	void init_tick_type_dict()
+	{
+		TICK_TYPE tick_type;
+		tick_type[tick_type_key_enum::TICKTYPE] = tick_type_enum::NOCHANGE;
+		tick_type[tick_type_key_enum::TICKCOLOR] = tick_color_enum::WHITE;
+		m_tick_type_dict[open_interest_delta_forward_enum::NONE][order_forward_enum::UP] = tick_type;
+		m_tick_type_dict[open_interest_delta_forward_enum::NONE][order_forward_enum::DOWN] = tick_type;
+		m_tick_type_dict[open_interest_delta_forward_enum::NONE][order_forward_enum::MIDDLE] = tick_type;
+
+		tick_type[tick_type_key_enum::TICKTYPE] = tick_type_enum::EXCHANGELONG;
+		tick_type[tick_type_key_enum::TICKCOLOR] = tick_color_enum::RED;
+		m_tick_type_dict[open_interest_delta_forward_enum::EXCHANGE][order_forward_enum::UP] = tick_type;
+		tick_type[tick_type_key_enum::TICKTYPE] = tick_type_enum::EXCHANGESHORT;
+		tick_type[tick_type_key_enum::TICKCOLOR] = tick_color_enum::GREEN;
+		m_tick_type_dict[open_interest_delta_forward_enum::EXCHANGE][order_forward_enum::DOWN] = tick_type;
+		tick_type[tick_type_key_enum::TICKTYPE] = tick_type_enum::EXCHANGEUNKOWN;
+		tick_type[tick_type_key_enum::TICKCOLOR] = tick_color_enum::WHITE;
+		m_tick_type_dict[open_interest_delta_forward_enum::EXCHANGE][order_forward_enum::MIDDLE] = tick_type;
+
+		tick_type[tick_type_key_enum::TICKTYPE] = tick_type_enum::OPENDOUBLE;
+		tick_type[tick_type_key_enum::TICKCOLOR] = tick_color_enum::RED;
+		m_tick_type_dict[open_interest_delta_forward_enum::OPENFWDOUBLE][order_forward_enum::UP] = tick_type;
+		tick_type[tick_type_key_enum::TICKTYPE] = tick_type_enum::OPENDOUBLE;
+		tick_type[tick_type_key_enum::TICKCOLOR] = tick_color_enum::GREEN;
+		m_tick_type_dict[open_interest_delta_forward_enum::OPENFWDOUBLE][order_forward_enum::DOWN] = tick_type;
+		tick_type[tick_type_key_enum::TICKTYPE] = tick_type_enum::OPENDOUBLE;
+		tick_type[tick_type_key_enum::TICKCOLOR] = tick_color_enum::WHITE;
+		m_tick_type_dict[open_interest_delta_forward_enum::OPENFWDOUBLE][order_forward_enum::MIDDLE] = tick_type;
+
+		tick_type[tick_type_key_enum::TICKTYPE] = tick_type_enum::OPENLONG;
+		tick_type[tick_type_key_enum::TICKCOLOR] = tick_color_enum::RED;
+		m_tick_type_dict[open_interest_delta_forward_enum::OPEN][order_forward_enum::UP] = tick_type;
+		tick_type[tick_type_key_enum::TICKTYPE] = tick_type_enum::OPENSHORT;
+		tick_type[tick_type_key_enum::TICKCOLOR] = tick_color_enum::GREEN;
+		m_tick_type_dict[open_interest_delta_forward_enum::OPEN][order_forward_enum::DOWN] = tick_type;
+		tick_type[tick_type_key_enum::TICKTYPE] = tick_type_enum::OPENUNKOWN;
+		tick_type[tick_type_key_enum::TICKCOLOR] = tick_color_enum::WHITE;
+		m_tick_type_dict[open_interest_delta_forward_enum::OPEN][order_forward_enum::MIDDLE] = tick_type;
+
+		tick_type[tick_type_key_enum::TICKTYPE] = tick_type_enum::CLOSEDOUBLE;
+		tick_type[tick_type_key_enum::TICKCOLOR] = tick_color_enum::RED;
+		m_tick_type_dict[open_interest_delta_forward_enum::CLOSEFWDOUBLE][order_forward_enum::UP] = tick_type;
+		tick_type[tick_type_key_enum::TICKTYPE] = tick_type_enum::CLOSEDOUBLE;
+		tick_type[tick_type_key_enum::TICKCOLOR] = tick_color_enum::GREEN;
+		m_tick_type_dict[open_interest_delta_forward_enum::CLOSEFWDOUBLE][order_forward_enum::DOWN] = tick_type;
+		tick_type[tick_type_key_enum::TICKTYPE] = tick_type_enum::CLOSEDOUBLE;
+		tick_type[tick_type_key_enum::TICKCOLOR] = tick_color_enum::WHITE;
+		m_tick_type_dict[open_interest_delta_forward_enum::CLOSEFWDOUBLE][order_forward_enum::MIDDLE] = tick_type;
+
+		tick_type[tick_type_key_enum::TICKTYPE] = tick_type_enum::CLOSESHORT;
+		tick_type[tick_type_key_enum::TICKCOLOR] = tick_color_enum::RED;
+		m_tick_type_dict[open_interest_delta_forward_enum::CLOSE][order_forward_enum::UP] = tick_type;
+		tick_type[tick_type_key_enum::TICKTYPE] = tick_type_enum::CLOSELONG;
+		tick_type[tick_type_key_enum::TICKCOLOR] = tick_color_enum::GREEN;
+		m_tick_type_dict[open_interest_delta_forward_enum::CLOSE][order_forward_enum::DOWN] = tick_type;
+		tick_type[tick_type_key_enum::TICKTYPE] = tick_type_enum::CLOSEUNKOWN;
+		tick_type[tick_type_key_enum::TICKCOLOR] = tick_color_enum::WHITE;
+		m_tick_type_dict[open_interest_delta_forward_enum::CLOSE][order_forward_enum::MIDDLE] = tick_type;
+	}
+
+	void init_handicap_dict()
+	{
+		m_handicap_dict[tick_type_enum::OPENLONG][opponent_key_enum::OPPOSITE] = tick_type_enum::CLOSELONG;
+		m_handicap_dict[tick_type_enum::OPENLONG][opponent_key_enum::SIMILAR] = tick_type_enum::OPENSHORT;
+
+		m_handicap_dict[tick_type_enum::OPENSHORT][opponent_key_enum::OPPOSITE] = tick_type_enum::CLOSESHORT;
+		m_handicap_dict[tick_type_enum::OPENSHORT][opponent_key_enum::SIMILAR] = tick_type_enum::OPENLONG;
+
+		m_handicap_dict[tick_type_enum::CLOSELONG][opponent_key_enum::OPPOSITE] = tick_type_enum::OPENLONG;
+		m_handicap_dict[tick_type_enum::CLOSELONG][opponent_key_enum::SIMILAR] = tick_type_enum::CLOSESHORT;
+
+		m_handicap_dict[tick_type_enum::CLOSESHORT][opponent_key_enum::OPPOSITE] = tick_type_enum::OPENSHORT;
+		m_handicap_dict[tick_type_enum::CLOSESHORT][opponent_key_enum::SIMILAR] = tick_type_enum::CLOSELONG;
+	}
+
+	void init_tick_type_str_dict()
+	{
+		m_tick_type_str_dict[tick_type_enum::OPENLONG] = "多开";
+		m_tick_type_str_dict[tick_type_enum::OPENSHORT] = "空开";
+		m_tick_type_str_dict[tick_type_enum::OPENDOUBLE] = "双开";
+		m_tick_type_str_dict[tick_type_enum::CLOSELONG] = "多平";
+		m_tick_type_str_dict[tick_type_enum::CLOSESHORT] = "空平";
+		m_tick_type_str_dict[tick_type_enum::CLOSEDOUBLE] = "双平";
+		m_tick_type_str_dict[tick_type_enum::EXCHANGELONG] = "多换";
+		m_tick_type_str_dict[tick_type_enum::EXCHANGESHORT] = "空换";
+		m_tick_type_str_dict[tick_type_enum::OPENUNKOWN] = "未知开仓";
+		m_tick_type_str_dict[tick_type_enum::CLOSEUNKOWN] = "未知平仓";
+		m_tick_type_str_dict[tick_type_enum::EXCHANGEUNKOWN] = "未知换仓";
+		m_tick_type_str_dict[tick_type_enum::UNKOWN] = "未知";
+		m_tick_type_str_dict[tick_type_enum::NOCHANGE] = "没有变化";
+
+		m_color_type_str_dict[tick_color_enum::RED] = "红";
+		m_color_type_str_dict[tick_color_enum::GREEN] = "绿";
+		m_color_type_str_dict[tick_color_enum::WHITE] = "白";
+	}
+
+
+
+
+
+
+
+
+
+
 private:
 	// 指向CThostFtdcMduserApi实例的指针
 	CThostFtdcMdApi *m_pUserMdApi;
+
+	CThostFtdcDepthMarketDataField m_preDepthMarketData;
+	typedef map<tick_type_key_enum, int> TICK_TYPE;
+	typedef map<open_interest_delta_forward_enum, map<order_forward_enum, TICK_TYPE>> TICK_TYPE_DICT;
+	TICK_TYPE_DICT m_tick_type_dict;
+	typedef map<tick_type_enum, map<opponent_key_enum, int> > HANDICAP_DICT;
+	HANDICAP_DICT m_handicap_dict;
+	typedef map<int, string> TICK_TYPE_STR_DICT;
+	TICK_TYPE_STR_DICT m_tick_type_str_dict;
+	TICK_TYPE_STR_DICT m_color_type_str_dict;
+
+	TThostFtdcMdcsvFileName     m_chMdcsvFileName;
+	TThostFtdcMdPankouFileName  m_chMdPankouFileName;
+
+	bool m_bPankouData = false;
+
+
 };
 
 //交易类
